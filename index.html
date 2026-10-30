@@ -1,0 +1,981 @@
+<!-- telegram/discord: ytmoki -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дорога к храму | Вертелишки</title>
+
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-soft: #EEF2FF;
+            --text-main: #111827;
+            --text-muted: #4B5563;
+            --bg-card: rgba(255, 255, 255, 0.96);
+            --border-light: rgba(229, 231, 235, 0.85);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Manrope', -apple-system, sans-serif;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        .top-bar-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+            flex-wrap: wrap;
+        }
+
+        .logistics-toggle-btn {
+            background: #ffffff;
+            color: var(--text-main);
+            border: 1px solid var(--border-light);
+            border-radius: 9999px;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+
+        .logistics-toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.18);
+        }
+
+        .route-mode-switch {
+            display: flex;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-light);
+            border-radius: 9999px;
+            padding: 4px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+            gap: 4px;
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mode-btn:hover {
+            color: var(--text-main);
+        }
+
+        .mode-btn.active {
+            background: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+        }
+
+        #info-card {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 410px;
+            max-height: calc(100vh - 40px);
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+            transform: translateX(-120%);
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #info-card.active {
+            transform: translateX(0);
+        }
+
+        .card-header {
+            position: relative;
+            padding: 22px 24px 16px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: #F3F4F6;
+            border: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            font-size: 20px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: #E5E7EB;
+            color: var(--text-main);
+        }
+
+        .card-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--primary);
+            background: var(--primary-soft);
+            padding: 4px 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-main);
+            line-height: 1.25;
+            padding-right: 30px;
+        }
+
+        .card-body {
+            padding: 20px 24px 24px;
+            overflow-y: auto;
+        }
+
+        .card-body::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .card-body::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .card-body img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 16px;
+            margin-bottom: 16px;
+            background: #e2e8f0;
+            display: block;
+            cursor: zoom-in;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .gallery-grid img {
+            height: 140px;
+            margin-bottom: 0;
+        }
+
+        .card-body img:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .text-content p {
+            margin: 0 0 12px 0;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+
+        .text-content p strong {
+            color: var(--text-main);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 6px;
+            background: #F1F5F9;
+            padding: 4px;
+            border-radius: 14px;
+            margin-bottom: 16px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 8px 4px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748B;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+
+        .tab-btn.active {
+            background: #ffffff;
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logistics-card {
+            background: #F8FAFC;
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-top: 14px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .logistics-card h4 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .logistics-item {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .logistics-item:last-child {
+            margin-bottom: 0;
+        }
+
+        #lightbox-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(10, 15, 29, 0.92);
+            backdrop-filter: blur(10px);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #lightbox-modal.active {
+            display: flex;
+        }
+
+        #lightbox-img {
+            max-width: 90vw;
+            max-height: 85vh;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+            cursor: grab;
+            transition: transform 0.05s linear;
+            transform-origin: center center;
+        }
+
+        #lightbox-img:active {
+            cursor: grabbing;
+        }
+
+        .lightbox-controls {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 8px 16px;
+            border-radius: 9999px;
+            backdrop-filter: blur(8px);
+            z-index: 10001;
+        }
+
+        .lb-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            font-size: 20px;
+            font-weight: bold;
+            color: #111827;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .lb-btn:hover {
+            background: #ffffff;
+            transform: scale(1.1);
+        }
+
+        .lightbox-close-btn {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            font-size: 26px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            z-index: 10001;
+        }
+
+        .lightbox-close-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 768px) {
+            .top-bar-controls {
+                top: 15px;
+                left: 15px;
+                right: 15px;
+            }
+            #info-card {
+                width: 100%;
+                top: auto;
+                bottom: 0;
+                left: 0;
+                border-radius: 24px 24px 0 0;
+                max-height: 75vh;
+                transform: translateY(120%);
+            }
+            #info-card.active {
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar-controls">
+        <button class="logistics-toggle-btn" id="btn-logistics" type="button">
+            🚌 Логистика
+        </button>
+
+        <div class="route-mode-switch">
+            <button class="mode-btn active" data-mode="direct" type="button">
+                📐 Прямой
+            </button>
+            <button class="mode-btn" data-mode="pedestrian" type="button">
+                🚶 Пешком (по координатам)
+            </button>
+            <button class="mode-btn" data-mode="auto" type="button">
+                🚗 На авто (по координатам)
+            </button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="info-card">
+        <div class="card-header">
+            <span class="card-badge" id="card-badge">Маршрут</span>
+            <h2 class="card-title" id="card-title">Локация</h2>
+            <button class="close-btn" id="btn-close-card" type="button">×</button>
+        </div>
+        <div class="card-body" id="card-body"></div>
+    </div>
+
+    <div id="lightbox-modal">
+        <button class="lightbox-close-btn" id="btn-lb-close" type="button">&times;</button>
+        <img id="lightbox-img" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Увеличенное фото">
+        <div class="lightbox-controls">
+            <button class="lb-btn" id="btn-zoom-in" type="button">+</button>
+            <button class="lb-btn" id="btn-zoom-out" type="button">−</button>
+            <button class="lb-btn" id="btn-zoom-reset" type="button">↺</button>
+        </div>
+    </div>
+
+    <script>
+        /* global ymaps */
+        // noinspection JSUnresolvedReference
+
+        const infoCard = document.getElementById('info-card');
+        const cardBadge = document.getElementById('card-badge');
+        const cardTitle = document.getElementById('card-title');
+        const cardBody = document.getElementById('card-body');
+        const lbModal = document.getElementById('lightbox-modal');
+        const lbImg = document.getElementById('lightbox-img');
+
+        /** @type {any} */
+        let myMap = null;
+        /** @type {any} */
+        let routeGroup = null;
+
+        // Прямоугольник ограничения: карту нельзя сдвинуть за пределы Вертелишек
+        const vertelishkiBounds = [
+            [53.6840, 23.9780], // Юго-западная граница
+            [53.7160, 24.0320]  // Северо-восточная граница
+        ];
+
+        // Точный контур границ агрогородка Вертелишки
+        const vertelishkiPolygonCoords = [
+            [53.7085, 23.9890],
+            [53.7125, 23.9985],
+            [53.7118, 24.0090],
+            [53.7092, 24.0195],
+            [53.7045, 24.0260],
+            [53.6965, 24.0245],
+            [53.6915, 24.0160],
+            [53.6905, 24.0030],
+            [53.6940, 23.9910],
+            [53.7010, 23.9840],
+            [53.7055, 23.9845]
+        ];
+
+        // Точки на карте:
+        // 1. Зелёная - Школа
+        // 2. Синяя - Свято-Александро-Невская церковь
+        // 3. Фиолетовая - Место захоронения настоятеля и нескольких прихожан
+        // 4. Оранжевая - Место бывшего училища
+        const coords = {
+            school: [53.700666, 24.004880],
+            church: [53.704146, 24.000343],
+            crypt: [53.704254, 24.000273],
+            schoolOld: [53.705857, 24.001493]
+        };
+
+        const routes = {
+            direct: {
+                seg1: [coords.school, coords.church],
+                seg2: [coords.church, coords.crypt],
+                seg3: [coords.crypt, coords.schoolOld],
+                style: 'shortdash'
+            },
+            pedestrian: {
+                seg1: [
+                    [53.700666, 24.004880],
+                    [53.700559, 24.005060],
+                    [53.700710, 24.005753],
+                    [53.700265, 24.006115],
+                    [53.700831, 24.006458],
+                    [53.701490, 24.006928],
+                    [53.701804, 24.007124],
+                    [53.701922, 24.007204],
+                    [53.702002, 24.006699],
+                    [53.702348, 24.006253],
+                    [53.702491, 24.005810],
+                    [53.703031, 24.003395],
+                    [53.703237, 24.003273],
+                    [53.703674, 24.003240],
+                    [53.703775, 24.003107],
+                    [53.704479, 24.000255],
+                    [53.704224, 24.000071],
+                    [53.704146, 24.000343]
+                ],
+                seg2: [
+                    [53.704146, 24.000343],
+                    [53.704197, 24.000125],
+                    [53.704279, 24.000200],
+                    [53.704254, 24.000273]
+                ],
+                seg3: [
+                    [53.704254, 24.000273],
+                    [53.704279, 24.000187],
+                    [53.704197, 24.000119],
+                    [53.704236, 24.000049],
+                    [53.706054, 24.001431],
+                    [53.706012, 24.001596],
+                    [53.705857, 24.001493]
+                ],
+                style: 'solid'
+            },
+            auto: {
+                seg1: [
+                    [53.700441, 24.006347],
+                    [53.702173, 24.007480],
+                    [53.703045, 24.003537],
+                    [53.703078, 24.003462],
+                    [53.703143, 24.003397],
+                    [53.703244, 24.003349],
+                    [53.703576, 24.003322],
+                    [53.703669, 24.003295],
+                    [53.703724, 24.003252],
+                    [53.703777, 24.003167],
+                    [53.703822, 24.003033],
+                    [53.704147, 24.001655],
+                    [53.704514, 24.000206],
+                    [53.704220, 23.999983],
+                    [53.704146, 24.000343]
+                ],
+                seg2: [
+                    [53.704146, 24.000343],
+                    [53.704197, 24.000125],
+                    [53.704279, 24.000200],
+                    [53.704254, 24.000273]
+                ],
+                seg3: [
+                    [53.704254, 24.000273],
+                    [53.704279, 24.000187],
+                    [53.704197, 24.000119],
+                    [53.704220, 23.999983],
+                    [53.706109, 24.001448],
+                    [53.706049, 24.001660],
+                    [53.705857, 24.001493]
+                ],
+                style: 'solid'
+            }
+        };
+
+        const pointsData = [
+            {
+                coord: coords.school,
+                badge: "Точка 1 • Старт",
+                title: "Вертелишковская средняя школа",
+                color: '#10B981',
+                html: `
+                    <div class="text-content">
+                        <p><strong>Точка сбора и старт авторского маршрута «Дорога к храму».</strong> Маршрут пешеходный, его протяжённость составляет около 2 км по центру Вертелишек.</p>
+                        <div class="logistics-card">
+                            <h4>🧭 Способы передвижения из Гродно</h4>
+                            <div class="logistics-item">🚌 <strong>Автобус:</strong> Регулярное автобусное сообщение от автовокзала Гродно до остановки «Вертелишки» (расстояние около 20 км).</div>
+                            <div class="logistics-item">🚗 <strong>Автомобиль:</strong> Около 20 минут в пути от Гродно, удобные подъездные пути и парковка у школы.</div>
+                            <div class="logistics-item">🚶 <strong>Пешком:</strong> Линейный пешеходный трек между всеми объектами маршрута.</div>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                coord: coords.church,
+                badge: "Точка 2 • Центральная",
+                title: "Свято-Александро-Невская церковь",
+                color: '#3B82F6',
+                html: `
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="tab-inside" type="button">В храме</button>
+                        <button class="tab-btn" data-tab="tab-wooden" type="button">Деревянный храм</button>
+                    </div>
+
+                    <div id="tab-inside" class="tab-content active text-content">
+                        <img src="image/photo1.jpg" class="zoomable-img" alt="Участники в храме">
+                        <p><strong>Свято-Александро-Невская церковь</strong> — действующий каменный храм, возведенный в 1843–1856 годах. Главный духовный и архитектурный центр агрогородка Вертелишки.</p>
+                        <p>Храм имеет классическую форму базилики и разделён внутри двумя рядами колонн на три нефа. Завершается звонницей с 8-гранным шатром и луковичной головкой, увенчанной крестом.</p>
+                        <p><strong>Настоятель:</strong> иерей Иоанн Гладун.</p>
+                    </div>
+
+                    <div id="tab-wooden" class="tab-content text-content">
+                        <img src="image/photo3.jpg" class="zoomable-img" alt="Участники на месте деревянного храма">
+                        <p><strong>Место первого деревянного храма.</strong> По преданию, первый православный храм стоял здесь ещё в XIV веке.</p>
+                        <p>В 1839 году обветшавшее здание разобрали, утварь и иконы временно перенесли в амбар имения, а на освободившемся месте заложили фундамент каменного храма.</p>
+                    </div>
+                `
+            },
+            {
+                coord: coords.crypt,
+                badge: "Точка 3 • Усыпальница",
+                title: "Место захоронения настоятеля и нескольких прихожан",
+                color: '#8B5CF6',
+                html: `
+                    <div class="text-content">
+                        <div class="gallery-grid">
+                            <img src="image/photo4.jpg" class="zoomable-img" alt="Место захоронения настоятеля и нескольких прихожан, фото 1">
+                            <img src="image/photo5.jpg" class="zoomable-img" alt="Место захоронения настоятеля и нескольких прихожан, фото 2">
+                        </div>
+                        <p><strong>Место захоронения настоятеля и прихожан.</strong> Расположено на прихрамовой территории, правее основного здания храма.</p>
+                        <p>Здесь упокоен священник Иоанн Гашунин, несший пастырское служение на приходе в конце 19 века, а также благочестивые прихожане, внесшие значительный вклад в созидание и сохранение святыни.</p>
+                    </div>
+                `
+            },
+            {
+                coord: coords.schoolOld,
+                badge: "Точка 4 • Финиш",
+                title: "Место бывшего церковно-приходского училища",
+                color: '#D97706',
+                html: `
+                    <div class="text-content">
+                        <div class="gallery-grid">
+                            <img src="image/photo6.jpg" class="zoomable-img" alt="Место училища, фото 1">
+                            <img src="image/photo7.jpg" class="zoomable-img" alt="Место училища, фото 2">
+                        </div>
+                        <p><strong>Здание церковно-приходского училища (1860 г.).</strong> Построено при настоятеле отце Владимире Страховиче. Располагается выше от храма за комплексом «Алникор».</p>
+                        <p>В 1861 году училище начало просветительскую деятельность. Первым учителем стал сам отец Владимир. На строительство совет выделил около 1,5 тысячи рублей серебром, собранных прихожанами.</p>
+                        <div class="logistics-card">
+                            <h4>🏪 Справочная информация</h4>
+                            <div class="logistics-item">Ближайшие пункты питания — кафе и магазины в аг. Вертелишки.</div>
+                        </div>
+                    </div>
+                `
+            }
+        ];
+
+        // noinspection JSUnresolvedReference
+        function init() {
+            /** @type {any} */
+            const ym = window['ymaps'];
+            if (!ym) return;
+
+            myMap = new ym.Map("map", {
+                center: [53.7035, 24.0025],
+                zoom: 16,
+                controls: ['zoomControl', 'fullscreenControl']
+            }, {
+                suppressMapOpenBlock: true,
+                // Ограничиваем область перемещения карты (нельзя утащить за Вертелишки)
+                restrictMapArea: vertelishkiBounds
+            });
+
+            // Задаем допустимые пределы масштабирования
+            myMap.options.set({
+                minZoom: 12,
+                maxZoom: 20
+            });
+
+            // Создаем и добавляем полигон обводки границы Вертелишек
+            const borderPolygon = new ym.Polygon([vertelishkiPolygonCoords], {
+                hintContent: 'Границы аг. Вертелишки'
+            }, {
+                fillColor: 'rgba(79, 70, 229, 0.05)',
+                strokeColor: '#4F46E5',
+                strokeOpacity: 0.85,
+                strokeWidth: 2.5,
+                strokeStyle: 'shortdash',
+                zIndex: 10
+            });
+            myMap.geoObjects.add(borderPolygon);
+
+            routeGroup = new ym.GeoObjectCollection();
+            myMap.geoObjects.add(routeGroup);
+
+            setRouteMode('direct');
+
+            pointsData.forEach((point) => {
+                /** @type {any} */
+                const placemark = new ym.Placemark(point.coord, {
+                    hintContent: point.title
+                }, {
+                    preset: 'islands#circleDotIcon',
+                    iconColor: point.color,
+                    zIndex: 900
+                });
+
+                placemark.events.add('click', () => {
+                    openCard(point.badge, point.title, point.html);
+                    const offsetLat = window.innerWidth < 640 ? point.coord[0] + 0.0015 : point.coord[0];
+                    const offsetLon = window.innerWidth >= 640 ? point.coord[1] - 0.0025 : point.coord[1];
+                    myMap.panTo([offsetLat, offsetLon], { duration: 400 });
+                });
+
+                myMap.geoObjects.add(placemark);
+            });
+
+            myMap.setBounds(myMap.geoObjects.getBounds(), { zoomMargin: 70 });
+        }
+
+        if (window['ymaps']) {
+            /** @type {any} */ (window['ymaps']).ready(init);
+        }
+
+        // noinspection JSUnresolvedReference
+        function setRouteMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === mode);
+            });
+
+            if (!routeGroup) return;
+            routeGroup.removeAll();
+
+            const currentRoute = routes[mode];
+            if (!currentRoute) return;
+
+            /** @type {any} */
+            const ym = window['ymaps'];
+            if (!ym) return;
+
+            // Отрезок 1: Школа -> Церковь (синий)
+            const polyline1 = new ym.Polyline(currentRoute.seg1, {}, {
+                strokeColor: '#3B82F6',
+                strokeWidth: 6,
+                strokeOpacity: 0.95,
+                strokeStyle: currentRoute.style,
+                lineJoin: 'round',
+                zIndex: 200
+            });
+
+            // Отрезок 2: Церковь -> Усыпальница (фиолетовый)
+            const polyline2 = new ym.Polyline(currentRoute.seg2, {}, {
+                strokeColor: '#8B5CF6',
+                strokeWidth: 6,
+                strokeOpacity: 0.95,
+                strokeStyle: currentRoute.style,
+                lineJoin: 'round',
+                zIndex: 200
+            });
+
+            // Отрезок 3: Усыпальница -> Училище (оранжевый)
+            const polyline3 = new ym.Polyline(currentRoute.seg3, {}, {
+                strokeColor: '#D97706',
+                strokeWidth: 6,
+                strokeOpacity: 0.95,
+                strokeStyle: currentRoute.style,
+                lineJoin: 'round',
+                zIndex: 200
+            });
+
+            routeGroup.add(polyline1);
+            routeGroup.add(polyline2);
+            routeGroup.add(polyline3);
+        }
+
+        function openCard(badge, title, html) {
+            cardBadge.innerText = badge;
+            cardTitle.innerText = title;
+            cardBody.innerHTML = html;
+
+            cardBody.querySelectorAll('img.zoomable-img').forEach(img => {
+                img.addEventListener('error', () => {
+                    img.style.display = 'none';
+                });
+            });
+
+            infoCard.classList.add('active');
+        }
+
+        function closeCard() {
+            infoCard.classList.remove('active');
+        }
+
+        function openLogistics() {
+            openCard(
+                "Транспортное сообщение",
+                "Логистика маршрута",
+                `
+                <div class="text-content">
+                    <p>Маршрут расположен в агрогородке Вертелишки, в 15 км от города Гродно.</p>
+                    <div class="logistics-card">
+                        <h4>🚌 Автобус</h4>
+                        <div class="logistics-item">Регулярные рейсовые пригородные автобусы и маршрутки с автовокзала Гродно.</div>
+                    </div>
+                    <div class="logistics-card">
+                        <h4>🚗 Автомобиль</h4>
+                        <div class="logistics-item">Поездка из Гродно занимает около 20 минут. Возле школы есть места для парковки.</div>
+                    </div>
+                    <div class="logistics-card">
+                        <h4>🚶 Пеший путь</h4>
+                        <div class="logistics-item">Протяжённость пешеходного маршрута между объектами — около 2 км.</div>
+                    </div>
+                </div>
+                `
+            );
+        }
+
+        cardBody.addEventListener('click', (e) => {
+            const tabBtn = e.target.closest('.tab-btn');
+            if (tabBtn) {
+                const tabId = tabBtn.dataset.tab;
+                cardBody.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                cardBody.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+                tabBtn.classList.add('active');
+                const targetContent = document.getElementById(tabId);
+                if (targetContent) targetContent.classList.add('active');
+                return;
+            }
+
+            const img = e.target.closest('.zoomable-img');
+            if (img && img.src) {
+                openLightbox(img.src);
+            }
+        });
+
+        document.getElementById('btn-logistics').addEventListener('click', openLogistics);
+        document.getElementById('btn-close-card').addEventListener('click', closeCard);
+
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => setRouteMode(btn.dataset.mode));
+        });
+
+        let currentScale = 1;
+        let posX = 0;
+        let posY = 0;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let initialPinchDist = null;
+
+        function updateTransform() {
+            lbImg.style.transform = `translate(${posX}px, ${posY}px) scale(${currentScale})`;
+        }
+
+        function openLightbox(src) {
+            lbImg.src = src;
+            currentScale = 1;
+            posX = 0;
+            posY = 0;
+            updateTransform();
+            lbModal.classList.add('active');
+        }
+
+        function closeLightbox() {
+            lbModal.classList.remove('active');
+        }
+
+        document.getElementById('btn-lb-close').addEventListener('click', closeLightbox);
+
+        lbModal.addEventListener('click', (e) => {
+            if (e.target === lbModal) closeLightbox();
+        });
+
+        document.getElementById('btn-zoom-in').addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentScale = Math.min(currentScale + 0.3, 4);
+            updateTransform();
+        });
+
+        document.getElementById('btn-zoom-out').addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentScale = Math.max(currentScale - 0.3, 0.8);
+            updateTransform();
+        });
+
+        document.getElementById('btn-zoom-reset').addEventListener('click', (e) => {
+            e.stopPropagation();
+            currentScale = 1;
+            posX = 0;
+            posY = 0;
+            updateTransform();
+        });
+
+        lbModal.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.15 : 0.15;
+            currentScale = Math.min(Math.max(currentScale + delta, 0.8), 4);
+            updateTransform();
+        }, { passive: false });
+
+        lbImg.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isDragging = true;
+            startX = e.clientX - posX;
+            startY = e.clientY - posY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            posX = e.clientX - startX;
+            posY = e.clientY - startY;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        lbModal.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isDragging = true;
+                startX = e.touches[0].clientX - posX;
+                startY = e.touches[0].clientY - posY;
+            } else if (e.touches.length === 2) {
+                isDragging = false;
+                initialPinchDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+            }
+        }, { passive: true });
+
+        lbModal.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1 && isDragging) {
+                posX = e.touches[0].clientX - startX;
+                posY = e.touches[0].clientY - startY;
+                updateTransform();
+            } else if (e.touches.length === 2 && initialPinchDist) {
+                const currentDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const factor = currentDist / initialPinchDist;
+                currentScale = Math.min(Math.max(currentScale * (factor > 1 ? 1.02 : 0.98), 0.8), 4);
+                updateTransform();
+            }
+        }, { passive: true });
+
+        lbModal.addEventListener('touchend', () => {
+            isDragging = false;
+            initialPinchDist = null;
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && lbModal.classList.contains('active')) {
+                closeLightbox();
+            }
+        });
+    </script>
+</body>
+</html>
